@@ -18,7 +18,7 @@ pub enum Color {
 
 
 // Piece enum
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Piece {
     King,
     Queen,
@@ -28,9 +28,27 @@ pub enum Piece {
     Pawn
 }
 
+// Cred: https://stackoverflow.com/questions/32710187/how-do-i-get-an-enum-as-a-string
+impl fmt::Display for Piece {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
 impl Piece {
     fn take_turn(&self, /*...*/)  {
         
+    }
+
+    fn represent(&self) -> &str {
+        match self {
+            Piece::King => {"K"},
+            Piece::Queen => {"Q"},
+            Piece::Bishop => {"B"},
+            Piece::Knight => {"Kn"},
+            Piece::Rook => {"R"},
+            Piece::Pawn => {"P"},
+        }
     }
 
     // ...
@@ -119,9 +137,45 @@ impl Game {
 /// |:----------------------:|
 impl fmt::Debug for Game {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        /* build board representation string */
-        
-        write!(f, "s");
+        let mut board_representation = String::from("");
+        board_representation.push_str("\n|:------------------------:|\n");
+        // row_pieces - the row that contains the current iterated pieces 
+        for row_pieces in &self.board {
+            let mut row_representation = String::from("");
+            // starting wall |
+            row_representation.push_str("|  ");
+            
+            // ppiece - potential piece, it could also be None
+            for ppiece in row_pieces {
+                match ppiece {
+                    // now that I know it's a piece I can call it piece
+                    Some((piece, _color)) => {
+                        // this ugly match statement is needed because Knight is represented by two characters 'Kn'
+                        // and without this compromise the board indentations get weird
+                        match piece {
+                            Piece::Knight => {
+                                row_representation.push_str(piece.represent());
+                                row_representation.push_str(" ");
+                            },
+                            _ => {
+                                row_representation.push_str(piece.represent());
+                                row_representation.push_str("  ");
+                            }
+                        }
+                    },
+                    None => {
+                        row_representation.push_str("*");
+                        row_representation.push_str("  ");
+                    }
+                }
+                
+            }
+            row_representation.push_str("|\n");
+            // borrow the row_representation so that it is not owned before pushing
+            board_representation.push_str(&row_representation);
+        }
+        board_representation.push_str("|:------------------------:|");
+        write!(f, "{}", board_representation)
     }
 }
 
@@ -150,5 +204,6 @@ mod tests {
         println!("{:?}", game);
 
         assert_eq!(game.get_game_state(), GameState::InProgress);
+        
     }
 }
