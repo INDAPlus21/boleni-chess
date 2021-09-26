@@ -57,7 +57,8 @@ impl Piece {
 pub struct Game {
     /* save board, active colour, ... */
     board: [[Option<(Piece, Color)>; 8]; 8],
-    state: GameState
+    state: GameState,
+    turn: Color,
 }
 
 impl Game {
@@ -91,11 +92,10 @@ impl Game {
                     }
                 }
                 board
-            }
+            },
+            turn: Color::White
         }
     }
-
-    
 
     /// If the current game state is InProgress and the move is legal, 
     /// move a piece and return the resulting state of the game.
@@ -119,6 +119,13 @@ impl Game {
     /// (optional) Don't forget to include en passent and castling.
     pub fn get_possible_moves(&self, _postion: String) -> Option<Vec<String>> {
         None
+    }
+
+    /// Returns the piece at the given position
+    /// Position (String) should be of format: <file><rank>
+    /// Example: A1, B3
+    fn get_piece(&self, position: String) -> Option<Piece> {
+        
     }
 }
 
