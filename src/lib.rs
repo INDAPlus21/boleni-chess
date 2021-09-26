@@ -1,5 +1,6 @@
 use std::fmt;
 use std::option::Option;
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum GameState {
@@ -39,6 +40,30 @@ impl Piece {
     fn take_turn(&self, /*...*/)  {
         
     }
+    
+    fn get_moves(&self, game: &Game, (file, rank): (usize, usize), color: Color) -> Option<Vec<String>> {
+        match self {
+            Piece::Rook => {
+                let moves: Vec<String> = vec!();
+                // There are 4 possible directions that the rook can move
+                // Below I handle them in the following order:
+                // Right, Left, Up, Down
+                for i in file..8 {
+                    match game.get_piece((i, rank)) {
+                        // t_color for target_color, separated from parameter 
+                        // color which is the color of the current piece
+                        Some((piece, t_color)) => {
+                            if !matches!(color, t_color) {
+                                moves.push()
+                            }
+                        }
+                    }
+                }
+                None
+        },
+            _ => None
+        }
+    }
 
     fn represent(&self) -> &str {
         match self {
@@ -59,6 +84,8 @@ pub struct Game {
     board: [[Option<(Piece, Color)>; 8]; 8],
     state: GameState,
     turn: Color,
+    file_values_i: HashMap<char, usize>,
+    file_values_l: [char; 8]
 }
 
 impl Game {
@@ -93,7 +120,23 @@ impl Game {
                 }
                 board
             },
-            turn: Color::White
+            turn: Color::White,
+            // Cred for this neat one-liner (user huon): https://stackoverflow.com/questions/28392008/more-concise-hashmap-initialization/58126168
+            // Preferably, I would like to have the following value as a constant and not have to create a new 
+            // one when a game is initialized, but in Rust you cannot have a constant HashMap
+            // I looked at https://crates.io/crates/phf - phf seems to support just this
+            // but seems like an overkill in this particular scenario.
+            // Furthermore, there are two variables file_values
+            // file_values_i is meant to rapidly convert from file (a letter) to an index
+            // file_values_l same as above but from index to letter
+            file_values_i: "abcdefgh".chars().enumerate().map(|(index, letter)| (letter, index)).collect::<HashMap<_,_>>(),
+            file_values_l: {
+                let chars = [' '; 8];
+                for (index, letter) in "abcdefgh".chars().enumerate() {
+                    chars[index] = letter
+                }
+                chars
+            }
         }
     }
 
@@ -117,15 +160,51 @@ impl Game {
     /// new positions of that piece. Don't forget to the rules for check. 
     /// 
     /// (optional) Don't forget to include en passent and castling.
-    pub fn get_possible_moves(&self, _postion: String) -> Option<Vec<String>> {
-        None
+    pub fn get_possible_moves(&self, _position: String) -> Option<Vec<String>> {
+        let (file, rank) = self.get_position_as_tuple(&_position);
+        match self.get_piece((file, rank)) {
+            Some((piece, color)) => {
+                // Return None if it's not your turn
+                if !matches!(self.turn, color) {
+                    return None;
+                }
+                piece.get_moves(&self, (file, rank), color)
+            },
+            None => None
+        }
+    }
+
+    /// Returns the given position as a tuple with format:
+    /// (file, rank), where file is the column that the piece is
+    /// placed on (0-7). And rank is the row of the piece (also 0-7)
+    /// ###Arguments:
+    /// position - the position as a string with format "<file><rank>"
+    fn get_position_as_tuple(&self, position: &String) -> (usize, usize) {
+        let pos_split = position.split_at(1);
+        let file: usize = match self.file_values_i.get(&pos_split.0.chars().next().unwrap()) {
+            Some(x) => *x,
+            None => panic!()
+        };
+        
+        let rank = pos_split.1.parse::<usize>().unwrap()-1;
+        (file, rank)
+    }
+
+    /// Returns the given position as a string with format:
+    /// "<file><rank>"
+    /// ###Arguments:
+    /// file - the column of the piece as a usize (0-7)
+    /// rank - the rank of the piece (0-7)
+    fn get_position_as_string(&self, (file, rank): (usize, usize)) -> String {
+        let position = String::from("");
+        
     }
 
     /// Returns the piece at the given position
     /// Position (String) should be of format: <file><rank>
     /// Example: A1, B3
-    fn get_piece(&self, position: String) -> Option<Piece> {
-        
+    fn get_piece(&self, (file, rank): (usize, usize)) -> Option<(Piece, Color)> {
+        return self.board[rank][file];
     }
 }
 
@@ -209,6 +288,7 @@ mod tests {
         let game = Game::new();
 
         println!("{:?}", game);
+        println!("{:?}", game.get_possible_moves("a1".to_owned()));
 
         assert_eq!(game.get_game_state(), GameState::InProgress);
         
