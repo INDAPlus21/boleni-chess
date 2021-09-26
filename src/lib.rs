@@ -11,10 +11,38 @@ pub enum GameState {
 
 
 // Color enum
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum Color {
     White,
     Black
+}
+
+// Cred: https://stackoverflow.com/questions/32710187/how-do-i-get-an-enum-as-a-string
+impl fmt::Display for Color {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
+impl Color {
+    /// Checks whether the given color is the same as this color
+    fn is_same_color_as(&self, color: Color) -> bool {
+        // I seriously could not find any better way to do this (compare two enum variants)
+        match self {
+            Color::White => {
+                match color {
+                    Color::White => return true,
+                    Color::Black => return false
+                }
+            },
+            Color::Black => {
+                match color {
+                    Color::White => return false,
+                    Color::Black => return true
+                }
+            }
+        }
+    }
 }
 
 
@@ -40,26 +68,66 @@ impl Piece {
     fn take_turn(&self, /*...*/)  {
         
     }
+
+    /// This method is made to avoid repeating code when iterating over possible moves. It returns true when
+    /// all squares leading up to another piece have been checked, so the loop it is placed in can get a signal to break
+    /// ###Arguments
+    /// game - The game
+    /// (file, rank) - the file of the square to check as a usize from 0-7, rank as is on a normal chess board except subtracted with 1
+    /// color - the color of the current piece
+    /// moves - the mutable vector in which the possible moves will be pushed to
+    fn check_moves(&self, game: &Game, (file, rank): (usize, usize), color: Color, moves: &mut Vec<String>) -> bool {
+        match game.get_piece((file, rank)) {
+            
+            // t_color for target_color, separated from parameter 
+            // color which is the color of the current piece
+            Some((_piece, t_color)) => {
+                println!("{:?}", t_color);
+                if !color.is_same_color_as(t_color) {
+                    println!("This does get called.");
+                    moves.push(game.get_position_as_string((file, rank)));
+                }
+                return true;
+            }
+            None => moves.push(game.get_position_as_string((file, rank)))
+        }
+        false
+    }
     
+    /// The method returns the possible moves for this particular piece
+    /// in given file and rank, with given color
+    /// ###Arguments
+    /// game - The game
+    /// (file, rank) - the file as a usize from 0-7, rank as is on a normal chess board except subtracted with 1
+    /// color - the color of the current piece
     fn get_moves(&self, game: &Game, (file, rank): (usize, usize), color: Color) -> Option<Vec<String>> {
         match self {
             Piece::Rook => {
-                let moves: Vec<String> = vec!();
+                let mut moves: Vec<String> = vec!();
                 // There are 4 possible directions that the rook can move
                 // Below I handle them in the following order:
                 // Right, Left, Up, Down
-                for i in file..8 {
-                    match game.get_piece((i, rank)) {
-                        // t_color for target_color, separated from parameter 
-                        // color which is the color of the current piece
-                        Some((piece, t_color)) => {
-                            if !matches!(color, t_color) {
-                                moves.push()
-                            }
-                        }
+                for i in file+1..8 {
+                    if self.check_moves(game, (i, rank), color, &mut moves) {
+                        break;
                     }
                 }
-                None
+                for i in (0..file).rev() {
+                    if self.check_moves(game, (i, rank), color, &mut moves) {
+                        break;
+                    }
+                }
+                for i in (0..rank).rev() {
+                    if self.check_moves(game, (file, i), color, &mut moves) {
+                        break;
+                    }
+                }
+                for i in rank+1..8 {
+                    if self.check_moves(game, (file, i), color, &mut moves) {
+                        break;
+                    }
+                }
+                Some(moves)
         },
             _ => None
         }
@@ -99,7 +167,7 @@ impl Game {
                 let mut board: [[Option<(Piece, Color)>; 8]; 8] = [[None; 8]; 8];
                 for (row, row_pieces) in board.iter_mut().enumerate() {
                     for (column, piece) in row_pieces.iter_mut().enumerate() {
-                        let color = {if row == 0 {Color::Black} else {Color::White}};
+                        let color = {if row == 0 || row == 1 {Color::Black} else {Color::White}};
                         match row {
                             0 | 7 => {
                                 *piece = {
@@ -118,6 +186,7 @@ impl Game {
                         }
                     }
                 }
+                board[3][3] = Some((Piece::Rook, Color::White));
                 board
             },
             turn: Color::White,
@@ -131,7 +200,7 @@ impl Game {
             // file_values_l same as above but from index to letter
             file_values_i: "abcdefgh".chars().enumerate().map(|(index, letter)| (letter, index)).collect::<HashMap<_,_>>(),
             file_values_l: {
-                let chars = [' '; 8];
+                let mut chars = [' '; 8];
                 for (index, letter) in "abcdefgh".chars().enumerate() {
                     chars[index] = letter
                 }
@@ -165,7 +234,7 @@ impl Game {
         match self.get_piece((file, rank)) {
             Some((piece, color)) => {
                 // Return None if it's not your turn
-                if !matches!(self.turn, color) {
+                if !self.turn.is_same_color_as(color) {
                     return None;
                 }
                 piece.get_moves(&self, (file, rank), color)
@@ -186,7 +255,7 @@ impl Game {
             None => panic!()
         };
         
-        let rank = pos_split.1.parse::<usize>().unwrap()-1;
+        let rank = 7-(pos_split.1.parse::<usize>().unwrap()-1);
         (file, rank)
     }
 
@@ -196,8 +265,11 @@ impl Game {
     /// file - the column of the piece as a usize (0-7)
     /// rank - the rank of the piece (0-7)
     fn get_position_as_string(&self, (file, rank): (usize, usize)) -> String {
-        let position = String::from("");
-        
+        let mut position = String::from("");
+        position.push(self.file_values_l[file]);
+        let rank = 8 - rank;
+        position.push_str(&rank.to_string());
+        position
     }
 
     /// Returns the piece at the given position
@@ -288,7 +360,8 @@ mod tests {
         let game = Game::new();
 
         println!("{:?}", game);
-        println!("{:?}", game.get_possible_moves("a1".to_owned()));
+        println!("{:?}", game.get_possible_moves("d5".to_owned()));
+        println!("{:?}", game.get_piece(game.get_position_as_tuple(&"d7".to_owned())));
 
         assert_eq!(game.get_game_state(), GameState::InProgress);
         
